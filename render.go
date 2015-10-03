@@ -91,6 +91,8 @@ type Options struct {
 	StreamingJSON bool
 	// Disables feature that renders http.StatusInternalServerError when an error occurs. Default is false.
 	DisableHTTPErrorRendering bool
+	// Require that all blocks executed in the layout are implemented in all templates using the layout. Default is false.
+	RequireBlocks bool
 }
 
 // HTMLOptions is a struct for overriding some rendering Options for specific HTML call.
@@ -275,9 +277,13 @@ func (r *Render) addLayoutFuncs(name string, binding interface{}) {
 			return name, nil
 		},
 		"block": func(blockName string) (template.HTML, error) {
-			buf, err := r.execute(fmt.Sprintf("%s-%s", blockName, name), binding)
-			// Return safe HTML here since we are rendering our own template.
-			return template.HTML(buf.String()), err
+			fullBlockName := fmt.Sprintf("%s-%s", blockName, name)
+			if r.opt.RequireBlocks || r.TemplateLookup(fullBlockName) != nil {
+				buf, err := r.execute(fullBlockName, binding)
+				// Return safe HTML here since we are rendering our own template.
+				return template.HTML(buf.String()), err
+			}
+			return "", nil
 		},
 	}
 	if tpl := r.templates.Lookup(name); tpl != nil {
